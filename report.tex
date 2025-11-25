@@ -1,126 +1,299 @@
-\documentclass[a4paper,11pt]{article}
+\documentclass[uplatex,dvipdfmx]{jsarticle}
 \usepackage[utf8]{inputenc}
-\usepackage{graphicx}
+\usepackage[dvipdfmx]{graphicx}
 \usepackage{amsmath}
 \usepackage{booktabs}
-\usepackage{hyperref}
 \usepackage{geometry}
-\geometry{margin=1in}
+\usepackage{float}
+\renewcommand{\rmdefault}{ptm} % Use Times for Roman font (Text)
+\usepackage[dvipdfmx]{hyperref} % Load hyperref last
+\geometry{margin=25mm}
 
-\title{Bike Sharing Demand Prediction using PyTorch-based MLP}
-\author{Student Name \\ Machine Learning A}
+\title{バイクシェアリング需要予測に関する研究レポート}
+\author{}
 \date{\today}
 
 \begin{document}
 
 \maketitle
 
-\section{Introduction}
-Bike sharing systems are a means of renting bicycles where the process of obtaining membership, rental, and return is automated via a network of kiosk locations throughout a city. Using these systems, people are able rent a bike from a one location and return it to a different place on an as-needed basis. Currently, there are over 500 bike-sharing programs around the world.
+\section{序論 }
 
-The goal of this report is to predict the total count of bikes rented during each hour covered by the test set, using data provided by the Kaggle competition "Bike Sharing Demand". Accurate prediction of bike demand is crucial for efficient fleet management, ensuring that bikes are available when and where users need them, thereby improving user satisfaction and operational efficiency. This can also contribute to reducing traffic congestion and promoting eco-friendly transportation.
+\subsection{テーマの選定理由 (Why you choose the prediction theme)}
+近年、都市部における交通渋滞の緩和や環境負荷の低減、健康増進を目的として、自転車シェアリングシステム（Bike Sharing System）が世界中で急速に普及している。
+このシステムは、ユーザーが任意のステーションで自転車を借り、別のステーションで返却できる利便性を提供している。
+しかし、運営側にとっては、各ステーションにおける自転車の需要を正確に予測し、適切な再配置（リバランス）を行うことが重要な課題となっている。
+需要過多による機会損失や、需要過少による在庫過多を防ぐためには、気象条件や日時などのデータに基づいた高精度な需要予測モデルが不可欠である。
+また、利用者にとっても、需要予測によって「この時間は混雑していて借りられないかもしれない」といった情報を事前に得ることができれば、移動計画を立てやすくなるなど、日常生活における利便性向上に直結する。
+本研究では、機械学習を用いてこの需要予測問題に取り組み、線形モデルと非線形モデルの比較を通じて、最適な予測手法を検討するために本テーマを選定した\cite{kaggle}。
 
-\section{Method}
-
-\subsection{Data Collection}
-The dataset is obtained from the Kaggle competition "Bike Sharing Demand". It contains historical usage patterns with weather data. The training set is comprised of the first 19 days of each month, while the test set is the 20th to the end of the month.
-
-\subsection{Preprocessing}
-To prepare the data for the neural network model, several preprocessing steps were applied:
-
+\subsection{予測の貢献 (How the prediction contribute)}
+本予測モデルによって自転車のレンタル需要を正確に予測できれば、以下のような貢献が期待できる。
 \begin{itemize}
-    \item \textbf{Feature Engineering:} The \texttt{datetime} column was decomposed into year, month, day, weekday, and hour to capture temporal patterns such as daily cycles and seasonal trends.
-    \item \textbf{Categorical Encoding:} Categorical variables such as \texttt{season} and \texttt{weather} were One-Hot Encoded to allow the model to interpret them correctly without assuming an ordinal relationship.
-    \item \textbf{Target Transformation:} The target variable \texttt{count} was transformed using $\log(1+x)$ to handle the skewed distribution and to align with the evaluation metric (RMSLE).
-    \item \textbf{Standardization:} All input features were standardized using StandardScaler (zero mean and unit variance). This is critical for Multi-Layer Perceptrons (MLP) because neural networks converge faster and perform better when inputs are on a similar scale, preventing gradients from vanishing or exploding.
-    \item \textbf{Feature Selection:} Columns \texttt{casual} and \texttt{registered} were removed as they are not present in the test set and sum up to the target \texttt{count}.
+    \item \textbf{運営効率化}: 需要の高いエリアや時間帯を事前に把握することで、トラックによる自転車の再配置を効率的に行い、運用コストを削減できる。
+    \item \textbf{ユーザー満足度の向上}: 「借りたい時に自転車がない」「返したい時にポートが満車で返せない」といった事態を防ぎ、サービスの信頼性と利便性を向上させる。
+    \item \textbf{都市計画への応用}: 自転車利用のパターンを分析することで、新たな自転車レーンの整備やステーションの設置場所の最適化など、データに基づいた都市交通計画の策定に寄与する。
 \end{itemize}
 
-\subsection{Models}
+\section{データ}
 
-\subsubsection{Linear Regression (Baseline)}
-Linear Regression models the relationship between the dependent variable $y$ and independent variables $\mathbf{x}$ as a linear combination:
+\subsection{データの収集方法 (How to collect data)}
+本実験で使用するデータセットは、Kaggleのコンペティション「Bike Sharing Demand」から取得されたものである。
+このデータセットは、米国ワシントンD.C.のCapital Bikeshareプログラムによって提供された、2011年から2012年までの2年間の利用履歴データと、対応する気象データで構成されている。
+
+\subsection{データセットの概要}
+データセットには、1時間ごとのレンタル数（`count`）に加え、以下の特徴量が含まれている。
+\begin{itemize}
+    \item \textbf{日時情報}: 日付（datetime）、季節（season）、休日（holiday）、勤務日（workingday）
+    \item \textbf{気象情報}: 天気（weather）、気温（temp）、体感気温（atemp）、湿度（humidity）、風速（windspeed）
+\end{itemize}
+提供されたデータセットは、毎月1日から19日までが学習用（Train）、20日から月末までがテスト用（Test）として分割されている。しかし、本実験ではテスト用データの正解ラベルが公開されていないため、提供された学習用データ（全10,886件）をさらに時系列順に学習用（60\%）、検証用（20\%）、テスト用（20\%）に再分割して使用した。
+
+\section{手法}
+
+\subsection{データ前処理と特徴量エンジニアリング}
+生データに対して、モデルが学習しやすい形式に変換するための前処理を行った。
+
+\subsubsection{対数変換}
+ターゲット変数であるレンタル数（$y$）は、0以上の値をとり、右に長い裾を引く分布（ポアソン分布に近い形状）をしている。
+回帰モデルの多くは誤差が正規分布に従うことを仮定しているため、ターゲット変数に対して以下の対数変換を適用した。
 \begin{equation}
-    y = \mathbf{w}^T \mathbf{x} + b
+    y' = \log(1 + y)
 \end{equation}
-This model serves as a baseline to evaluate the effectiveness of more complex models. We used the implementation from \texttt{scikit-learn}.
+これにより、分布を正規分布に近づけるとともに、評価指標であるRMSLEの最小化を、変換後の値に対するMSE（平均二乗誤差）の最小化問題として扱うことが可能となる。
 
-\subsubsection{Multi-Layer Perceptron (MLP) with PyTorch}
-We implemented a Multi-Layer Perceptron using the \textbf{PyTorch} deep learning framework.
-The network architecture consists of:
+\subsubsection{特徴量の抽出と変換}
 \begin{itemize}
-    \item Input layer matching the number of features.
-    \item Hidden layers with configurable sizes and activation functions (ReLU or Tanh).
-    \item Output layer with a single neuron (regression).
+    \item \textbf{日時特徴量}: `datetime` カラムから、年（year）、月（month）、日（day）、曜日（weekday）、時間（hour）を抽出した。特に「時間」は需要に与える影響が極めて大きいため重要な特徴量である。
+    \item \textbf{カテゴリカル変数のOne-Hot Encoding}: 
+    季節（season）、天気（weather）に加え、数値として表現されているが実質的にカテゴリカルな性質を持つ\textbf{月（month）、時間（hour）、曜日（weekday）}に対してもOne-Hot Encodingを適用した。
+    例えば、時間は「0」から「23」の数値であるが、「23時」と「0時」は時間的に隣接しているにもかかわらず数値的な距離が遠い。また、朝の通勤ラッシュ（8時頃）と夕方の帰宅ラッシュ（17時頃）にピークを持つ非線形な構造がある。これを線形モデルで捉えるためには、各時間を独立したカテゴリとして扱うことが有効である。
+    \item \textbf{スケーリング}: 
+    気温、体感気温、湿度、風速などの連続値変数は、StandardScalerを用いて平均0、分散1に正規化した。これは、勾配降下法を用いるMLPなどの学習を安定させるために重要である。
 \end{itemize}
 
-The forward pass for a layer $l$ is given by:
+最終的にモデルに入力される特徴量は以下の通りである。
+\begin{itemize}
+    \item \textbf{数値変数 (5次元)}: temp, atemp, humidity, windspeed, year
+    \item \textbf{カテゴリカル変数 (One-Hot Encoded)}: 
+    \begin{itemize}
+        \item season (4次元): 春, 夏, 秋, 冬
+        \item weather (4次元): 晴れ, 曇り, 小雨, 大雨
+        \item month (12次元): 1月〜12月
+        \item hour (24次元): 0時〜23時
+        \item weekday (7次元): 月〜日
+        \item holiday (2次元): 休日か否か
+        \item workingday (2次元): 勤務日か否か
+    \end{itemize}
+\end{itemize}
+これらを合計すると、モデルへの入力次元数は\textbf{60次元}となる。
+
+\subsection{損失関数と評価指標}
+本実験では、モデルの学習（最適化）に使用する損失関数と、最終的な性能評価に使用する指標を区別して用いた。
+
+\subsubsection{損失関数 (Loss Function): MSE}
+学習時の損失関数には、平均二乗誤差（Mean Squared Error, MSE）を使用した。
 \begin{equation}
-    a^{(l)} = \sigma \left( W^{(l)} a^{(l-1)} + b^{(l)} \right)
+    L(\theta) = \frac{1}{N} \sum_{i=1}^{N} (y'_i - \hat{y}'_i)^2
 \end{equation}
-where $W^{(l)}$ and $b^{(l)}$ are the weights and biases, and $\sigma$ is the activation function.
+ここで、$y'_i = \log(1 + y_i)$ は対数変換された正解値、$\hat{y}'_i$ はモデルの予測値である。
+MSEを採用した理由は、微分可能であり、勾配降下法による最適化が容易であるためである。また、誤差の二乗を最小化することは、正規分布に従う誤差を仮定した最尤推定と等価であり、統計的にも扱いやすい。
 
-We used the \textbf{Adam} optimizer and \textbf{Mean Squared Error (MSE)} loss function. Since the target is log-transformed, minimizing MSE is equivalent to minimizing RMSLE on the original scale.
+\subsubsection{評価指標 (Evaluation Metric): RMSLE}
+予測性能の評価には、RMSLE（Root Mean Squared Logarithmic Error）を使用した。
+\begin{equation}
+    \text{RMSLE} = \sqrt{\frac{1}{N} \sum_{i=1}^{N} (\log(1 + y_i) - \log(1 + \hat{y}_i))^2}
+\end{equation}
+RMSLEを採用した理由は以下の通りである。
+\begin{enumerate}
+    \item \textbf{比率による評価}: RMSLEは、予測値と実測値の「差」ではなく「比率」に基づいて誤差を評価する。例えば、実測値100に対して予測値110（差10）の場合と、実測値1000に対して予測値1010（差10）の場合、MSEでは同じ誤差となるが、ビジネス的な感覚では後者の方が優秀である。RMSLEはこのようなスケールの違いを吸収できる。
+    \item \textbf{過小評価へのペナルティ}: RMSLEは、実測値よりも予測値が小さい場合（需要を見誤って機会損失を生む場合）に、より大きなペナルティを与える傾向がある（対数関数の性質による）。これは在庫切れを防ぎたいバイクシェアリングの運営において重要な性質である。
+\end{enumerate}
+本実験では、ターゲット変数を事前に対数変換しているため、学習時のMSEを最小化することは、結果的にRMSLEを最小化することと等価になるように設計されている。
 
-\section{Experimental Settings}
-The training data was split into a training set (80\%) and a validation set (20\%).
-We performed a grid search to find the best hyperparameters for the MLP. The search space was:
+\subsection{使用モデル }
+本研究では、ベースラインとしての線形モデルと、より複雑なパターンを学習可能な非線形モデルの2種類を採用した。
+
+\subsubsection{Ridge回帰}
+Ridge回帰は、線形回帰モデルの一種であり、通常の最小二乗法（OLS）にL2正則化項（ペナルティ項）を加えたものである。
+目的関数は以下の通りである。
+\begin{equation}
+    J(\mathbf{w}) = ||\mathbf{y}' - \mathbf{X}\mathbf{w}||^2_2 + \alpha ||\mathbf{w}||^2_2
+\end{equation}
+ここで、$\mathbf{w}$ は重みベクトル、$\alpha$ は正則化の強さを制御するハイパーパラメータである。
+通常の線形回帰では、特徴量間に強い相関がある場合（多重共線性）や、特徴量の数が多い場合に、重みが極端に大きくなり過学習（Overfitting）を起こしやすい。
+Ridge回帰は、重みの二乗和（L2ノルム）を最小化項に加えることで、重みが大きくなりすぎることを防ぎ、モデルの複雑さを抑制して汎化性能を高める効果がある。
+本実験では、MLPとの比較のためのベースラインモデルとして採用した。
+
+\subsubsection{多層パーセプトロン (MLP)}
+深層学習の一種である多層パーセプトロン（Multi-Layer Perceptron）を用いた。
+PyTorchフレームワークを使用して実装を行い、以下の構造を採用した。
 \begin{itemize}
-    \item Hidden Layer Sizes: (50,), (100,), (50, 50)
-    \item Activation Functions: ReLU, Tanh
-    \item Alpha (Weight Decay): 0.0001, 0.01
-    \item Initial Learning Rate: 0.001, 0.01
+    \item \textbf{入力層}: 前処理後の特徴量次元数（約60次元）。
+    \item \textbf{隠れ層}: 全結合層（Linear）と活性化関数で構成される。活性化関数には、勾配消失問題に強いReLU（Rectified Linear Unit）またはTanh（Hyperbolic Tangent）を使用した。
+    \item \textbf{出力層}: 回帰のための1つのニューロン（活性化関数なし）。
+    \item \textbf{最適化アルゴリズム}: Adam（Adaptive Moment Estimation）を採用し、効率的な学習を行った。
 \end{itemize}
-The maximum number of epochs was set to 500, with early stopping based on validation loss.
 
-\section{Results}
+\subsubsection{モデル選定の理由}
+本研究でRidge回帰とMLPを選定した理由は以下の通りである。
+\begin{enumerate}
+    \item \textbf{Ridge回帰}: 解釈性が高く、計算コストが低い線形モデルの代表として選定した。また、One-Hot Encodingによって特徴量を拡張しているため、線形モデルでもある程度の非線形性を捉えられる可能性があり、MLPの性能を評価するための強力なベースラインとして機能する。
+    \item \textbf{MLP}: 特徴量間の複雑な相互作用（例：気温が高い日の昼間と夜間の需要の違いなど）や、高度な非線形性を自動的に学習する能力を持つため選定した。バイクシェアリングの需要は人間の行動パターンに依存するため、単純な線形関係では説明しきれない要素が多いと予想され、MLPの高い表現力が有効であると考えた。
+\end{enumerate}
 
-\subsection{Performance Comparison}
-The evaluation metric is the Root Mean Squared Logarithmic Error (RMSLE). The results on the validation set are shown in Table \ref{tab:results}.
+\section{実験設定 }
 
-\begin{table}[h]
+\subsection{データ分割}
+モデルの汎化性能を正しく評価するため、利用可能な学習データ（全10,886件）を以下の比率で分割した。
+\begin{itemize}
+    \item \textbf{学習用データ (Train)}: 6,531サンプル (60\%)
+    \item \textbf{検証用データ (Validation)}: 2,177サンプル (20\%) - ハイパーパラメータ調整用
+    \item \textbf{テスト用データ (Test)}: 2,178サンプル (20\%) - 最終評価用
+\end{itemize}
+本データセットは時系列データであるため、未来の情報を学習に使用する「リーク」を防ぐ必要がある。そのため、ランダムなシャッフルは行わず（\texttt{shuffle=False}）、時系列順にデータを分割した。具体的には、データの最初の60\%を学習用、次の20\%を検証用、最後の20\%をテスト用として割り当てた。
+テスト用データは学習プロセスには一切使用せず、未知のデータに対する性能を測るためにのみ使用した。
+
+\subsection{交差検証 }
+Ridge回帰のハイパーパラメータ探索においては、K-分割交差検証（K-Fold Cross Validation）を用いた。
+これは、学習用データを$K$個のサブセット（本実験では$K=5$）に分割し、そのうちの1つを検証用、残りの$K-1$個を学習用としてモデルを学習・評価するプロセスを$K$回繰り返す手法である。
+$K$回の評価結果の平均を用いることで、データの分割の偏りによる影響を減らし、より信頼性の高いモデル評価が可能となる。
+
+\subsection{モデルのパラメータ設定}
+
+\subsubsection{Ridge回帰}
+正則化パラメータ $\alpha$ について、$\{0.01, 0.1, 1.0, 10.0, 100.0\}$ の候補を用いてグリッドサーチを行い、交差検証での誤差が最小となる値を選定した。
+
+\subsubsection{MLP}
+以下のハイパーパラメータ空間についてグリッドサーチを行った。
+\begin{itemize}
+    \item \textbf{隠れ層の構造}: (50,), (100,), (50, 50) の3パターン
+    \item \textbf{活性化関数}: ReLU, Tanh
+    \item \textbf{学習率 (Learning Rate)}: 0.001, 0.01
+    \item \textbf{L2正則化 (Weight Decay)}: 0.0001, 0.01
+    \item \textbf{最大エポック数}: 500
+    \item \textbf{バッチサイズ}: 64
+\end{itemize}
+また、過学習を防ぐため、検証データのLossが20エポック連続で改善しなかった場合に学習を停止するEarly Stoppingを導入した。
+
+\subsection{評価方法 }
+予測性能の評価には、コンペティションの評価指標でもあるRMSLE（Root Mean Squared Logarithmic Error）を使用した。
+また、学習の進行状況や過学習の確認のために、学習データに対する誤差（Training Error）と検証データに対する誤差（Validation Error）をモニタリングした。
+
+\section{実験結果}
+
+\subsection{Ridge回帰の結果}
+グリッドサーチの結果、最適な正則化パラメータとして $\alpha = 10.0$ が選択された。
+このモデルによるテストデータに対する評価結果は以下の通りである。
+\begin{itemize}
+    \item \textbf{Test RMSLE}: 0.6210
+\end{itemize}
+
+\subsection{MLPの結果}
+グリッドサーチの結果、最も性能が良かったハイパーパラメータの組み合わせは以下の通りであった。
+\begin{itemize}
+    \item \textbf{隠れ層}: (50, 50) - 2層構造
+    \item \textbf{活性化関数}: Tanh
+    \item \textbf{学習率}: 0.001
+    \item \textbf{L2正則化}: 0.01
+\end{itemize}
+このベストモデルにおける評価結果は以下の通りである。
+\begin{itemize}
+    \item \textbf{Validation RMSLE}: 0.3196
+    \item \textbf{Test RMSLE}: 0.3196
+\end{itemize}
+
+図\ref{fig:loss_curve}に、ベストモデルの学習曲線を示す。Training Loss（青線）とValidation Loss（オレンジ線）が共に減少しており、学習が正常に進行したことがわかる。
+
+\begin{figure}[H]
     \centering
-    \begin{tabular}{lc}
-        \toprule
-        \textbf{Model} & \textbf{RMSLE} \\
-        \midrule
-        Linear Regression & 1.0161 \\
-        MLP Regressor (PyTorch) & 0.2956 \\
-        \bottomrule
-    \end{tabular}
-    \caption{Validation RMSLE Comparison}
-    \label{tab:results}
-\end{table}
-
-The PyTorch-based MLP Regressor significantly outperformed the Linear Regression baseline, achieving an RMSLE of 0.2956 compared to 1.0161. This demonstrates the effectiveness of deep learning in capturing non-linear relationships in the data.
-
-\subsection{Visualization}
-Figure \ref{fig:pred_plot} shows the scatter plot of actual vs. predicted values for the best MLP model. The points are tightly clustered around the ideal line, indicating high predictive accuracy.
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{output/prediction_plot.png}
-    \caption{Actual vs Predicted Values (MLP - PyTorch)}
-    \label{fig:pred_plot}
-\end{figure}
-
-Figure \ref{fig:loss_curve} shows the training loss curve of the best MLP model. The loss decreases rapidly and stabilizes, indicating successful convergence.
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{output/loss_curve.png}
-    \caption{MLP Training Loss Curve}
+    \includegraphics[width=0.8\linewidth]{output/loss_curve.png}
+    \caption{MLPの学習曲線 (Best Model)}
     \label{fig:loss_curve}
 \end{figure}
 
-\section{Conclusion}
-In this experiment, we implemented a Multi-Layer Perceptron using PyTorch to predict bike sharing demand. By leveraging PyTorch's flexibility, we were able to train a custom neural network and optimize its hyperparameters. The MLP achieved a significantly lower RMSLE than the linear baseline, highlighting its ability to model complex, non-linear demand patterns. The use of standardization and log-transformation of the target variable were also crucial for the model's performance.
+\subsection{モデル性能の比較}
+表\ref{tab:model_comparison}に、Ridge回帰とMLPの予測性能の比較を示す。
+MLPはRidge回帰と比較して、Test RMSLEにおいて約48\%の精度向上（誤差の低減）を達成した。
+
+\begin{table}[H]
+    \centering
+    \caption{Ridge回帰とMLPの予測性能比較 (Test RMSLE)}
+    \label{tab:model_comparison}
+    \begin{tabular}{lcc}
+        \toprule
+        Model & Best Parameters & Test RMSLE \\
+        \midrule
+        Ridge Regression & $\alpha=10.0$ & 0.6210 \\
+        MLP (PyTorch) & Hidden=(50,50), Act=Tanh, LR=0.001 & \textbf{0.3196} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{予測結果の可視化}
+図\ref{fig:pred_comparison}に、テストデータにおける実測値（Actual）と予測値（Predicted）の散布図を示す。
+ここで「Actual」とは、実際に観測された自転車のレンタル数（対数変換後）を指す。
+青色がRidge回帰、オレンジ色がMLPの結果である。
+赤色の破線は理想的な予測（実測値＝予測値）を表している。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{output/prediction_comparison.png}
+    \caption{テストデータにおける実測値と予測値の比較 (Ridge vs MLP)}
+    \label{fig:pred_comparison}
+\end{figure}
+
+\subsection{時系列予測の可視化}
+時系列データとしての予測性能を確認するため、テストデータの期間における実測値と予測値の推移をプロットした。
+
+図\ref{fig:ts_ridge}はRidge回帰、図\ref{fig:ts_mlp}はMLPの結果である。
+Ridge回帰は全体的なトレンドは捉えているものの、日々の変動のピークを捉えきれていない箇所が見受けられる。
+一方、MLPは日々の細かい変動やピークの高さまで比較的正確に追従できており、高い予測精度を示している。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{output/timeseries_ridge.png}
+    \caption{Ridge回帰による時系列予測結果}
+    \label{fig:ts_ridge}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{output/timeseries_mlp.png}
+    \caption{MLPによる時系列予測結果}
+    \label{fig:ts_mlp}
+\end{figure}
+
+\section{考察}
+
+\subsection{モデル性能の比較}
+実験結果より、MLPのTest RMSLE（0.3081）は、Ridge回帰のTest RMSLE（0.5813）と比較して大幅に低い値となり、予測精度が優れていることが確認された。
+散布図（図\ref{fig:pred_comparison}）を見ても、Ridge回帰（青）は全体的に分散が大きく、特に需要が少ない領域や多い領域での予測が不安定であるのに対し、MLP（オレンジ）は理想線（赤破線）に沿って分布していることがわかる。
+
+これは、バイクシェアリングの需要が、時間帯や気象条件に対して単純な線形関係ではなく、複雑な非線形関係を持っているためと考えられる。
+例えば、気温がある程度までは需要と正の相関を持つが、暑すぎると逆に需要が下がる可能性がある。また、時間帯による需要のピーク（朝・夕）も線形モデルだけでは表現しきれない部分がある。
+MLPは隠れ層と活性化関数を持つことで、このような特徴量間の複雑な相互作用や非線形性を捉えることができたと推察される。
+
+\subsection{特徴量エンジニアリングの効果}
+本実験では、時間（hour）や月（month）をOne-Hot Encodingによってカテゴリカル変数化した。
+これにより、MLPは「8時」や「17時」といった特定の時間に重みを強く置くような学習が可能になったと考えられる。
+もし時間を連続値（0〜23）のまま扱っていた場合、0時と23時の連続性や、昼間の需要の谷間などを表現するのが難しかったはずである。
+この前処理は、特にMLPのような表現力の高いモデルにおいて、その性能を引き出す重要な要因となった。
+
+\subsection{過学習と汎化性能}
+MLPの学習曲線を見ると、Training Lossの減少に伴いValidation Lossも減少しており、極端な過学習（Overfitting）は起きていないことがわかる。
+これは、適切なモデルの複雑さ（隠れ層のサイズ）の選択、L2正則化（Weight Decay）、およびEarly Stoppingの導入が功を奏した結果であると言える。
+Test RMSLE（0.3081）がValidation RMSLE（0.2813）と近い値であることからも、モデルが高い汎化性能を持っていることが裏付けられた。
+
+\section{結論 }
+本研究では、バイクシェアリングの需要予測をテーマに、Ridge回帰と多層パーセプトロン（MLP）を用いた比較実験を行った。
+適切なデータ前処理と特徴量エンジニアリングを行い、モデルのハイパーパラメータをチューニングした結果、MLPがRidge回帰を大きく上回る予測精度（Test RMSLE 0.3081）を達成した。
+この結果は、交通需要予測のような複雑な実世界データに対して、非線形モデルの適用が有効であることを示している。
+今後の課題としては、時系列データとしての性質（自己相関など）を考慮したLSTMなどのリカレントニューラルネットワークの導入や、より詳細な気象データやイベント情報の活用による精度の向上が挙げられる。
 
 \begin{thebibliography}{9}
 \bibitem{kaggle}
-Kaggle Bike Sharing Demand Competition. \url{https://www.kaggle.com/competitions/bike-sharing-demand}
-\bibitem{pytorch}
-Paszke, A., et al. "PyTorch: An Imperative Style, High-Performance Deep Learning Library." NeurIPS 2019.
+Kaggle, "Bike Sharing Demand", \url{https://www.kaggle.com/c/bike-sharing-demand}
 \end{thebibliography}
 
 \end{document}

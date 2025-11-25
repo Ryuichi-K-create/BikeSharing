@@ -33,8 +33,14 @@ class BikeSharingPreprocessor:
         X = df.drop(columns=[c for c in drop_cols if c in df.columns], errors='ignore')
         
         # カテゴリカルと数値の分離
-        cat_features = ['season', 'weather']
-        num_features = [c for c in X.columns if c not in cat_features]
+        # hour, month, weekday, season, weather はカテゴリカルとして扱う
+        cat_features = ['season', 'weather', 'holiday', 'workingday', 'month', 'hour', 'weekday']
+        # year, temp, atemp, humidity, windspeed は数値として扱う
+        num_features = ['temp', 'atemp', 'humidity', 'windspeed', 'year']
+        
+        # データフレームに存在しない列がある場合の対策
+        cat_features = [c for c in cat_features if c in X.columns]
+        num_features = [c for c in num_features if c in X.columns]
         
         # Preprocessing Pipeline
         preprocessor_step1 = ColumnTransformer(

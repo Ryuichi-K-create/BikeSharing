@@ -100,8 +100,8 @@ def main():
     # 1. データ読み込み
     print("Loading data...")
     # ファイル名が train.csv であることに注意
-    train_df = pd.read_csv('../data/train.csv')
-    test_df = pd.read_csv('../data/test.csv')
+    train_df = pd.read_csv('BikeSharing\data\train.csv')
+    test_df = pd.read_csv('BikeSharing\data\test.csv')
 
     # 2. 前処理
     print("Preprocessing data...")

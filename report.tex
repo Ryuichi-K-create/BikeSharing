@@ -154,6 +154,15 @@ PyTorchフレームワークを使用して実装を行い、以下の構造を�
 本データセットは時系列データであるため、未来の情報を学習に使用する「リーク」を防ぐ必要がある。そのため、ランダムなシャッフルは行わず（\texttt{shuffle=False}）、時系列順にデータを分割した。具体的には、データの最初の60\%を学習用、次の20\%を検証用、最後の20\%をテスト用として割り当てた。
 テスト用データは学習プロセスには一切使用せず、未知のデータに対する性能を測るためにのみ使用した。
 
+図\ref{fig:data_split}に、実際の時系列データにおける分割の様子を示す。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\linewidth]{output/data_split.png}
+    \caption{時系列順によるデータ分割 (Train: 60\%, Validation: 20\%, Test: 20\%)}
+    \label{fig:data_split}
+\end{figure}
+
 \subsection{交差検証 }
 Ridge回帰のハイパーパラメータ探索においては、K-分割交差検証（K-Fold Cross Validation）を用いた。
 これは、学習用データを$K$個のサブセット（本実験では$K=5$）に分割し、そのうちの1つを検証用、残りの$K-1$個を学習用としてモデルを学習・評価するプロセスを$K$回繰り返す手法である。

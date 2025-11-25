@@ -1,0 +1,126 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{Bike Sharing Demand Prediction using PyTorch-based MLP}
+\author{Student Name \\ Machine Learning A}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+Bike sharing systems are a means of renting bicycles where the process of obtaining membership, rental, and return is automated via a network of kiosk locations throughout a city. Using these systems, people are able rent a bike from a one location and return it to a different place on an as-needed basis. Currently, there are over 500 bike-sharing programs around the world.
+
+The goal of this report is to predict the total count of bikes rented during each hour covered by the test set, using data provided by the Kaggle competition "Bike Sharing Demand". Accurate prediction of bike demand is crucial for efficient fleet management, ensuring that bikes are available when and where users need them, thereby improving user satisfaction and operational efficiency. This can also contribute to reducing traffic congestion and promoting eco-friendly transportation.
+
+\section{Method}
+
+\subsection{Data Collection}
+The dataset is obtained from the Kaggle competition "Bike Sharing Demand". It contains historical usage patterns with weather data. The training set is comprised of the first 19 days of each month, while the test set is the 20th to the end of the month.
+
+\subsection{Preprocessing}
+To prepare the data for the neural network model, several preprocessing steps were applied:
+
+\begin{itemize}
+    \item \textbf{Feature Engineering:} The \texttt{datetime} column was decomposed into year, month, day, weekday, and hour to capture temporal patterns such as daily cycles and seasonal trends.
+    \item \textbf{Categorical Encoding:} Categorical variables such as \texttt{season} and \texttt{weather} were One-Hot Encoded to allow the model to interpret them correctly without assuming an ordinal relationship.
+    \item \textbf{Target Transformation:} The target variable \texttt{count} was transformed using $\log(1+x)$ to handle the skewed distribution and to align with the evaluation metric (RMSLE).
+    \item \textbf{Standardization:} All input features were standardized using StandardScaler (zero mean and unit variance). This is critical for Multi-Layer Perceptrons (MLP) because neural networks converge faster and perform better when inputs are on a similar scale, preventing gradients from vanishing or exploding.
+    \item \textbf{Feature Selection:} Columns \texttt{casual} and \texttt{registered} were removed as they are not present in the test set and sum up to the target \texttt{count}.
+\end{itemize}
+
+\subsection{Models}
+
+\subsubsection{Linear Regression (Baseline)}
+Linear Regression models the relationship between the dependent variable $y$ and independent variables $\mathbf{x}$ as a linear combination:
+\begin{equation}
+    y = \mathbf{w}^T \mathbf{x} + b
+\end{equation}
+This model serves as a baseline to evaluate the effectiveness of more complex models. We used the implementation from \texttt{scikit-learn}.
+
+\subsubsection{Multi-Layer Perceptron (MLP) with PyTorch}
+We implemented a Multi-Layer Perceptron using the \textbf{PyTorch} deep learning framework.
+The network architecture consists of:
+\begin{itemize}
+    \item Input layer matching the number of features.
+    \item Hidden layers with configurable sizes and activation functions (ReLU or Tanh).
+    \item Output layer with a single neuron (regression).
+\end{itemize}
+
+The forward pass for a layer $l$ is given by:
+\begin{equation}
+    a^{(l)} = \sigma \left( W^{(l)} a^{(l-1)} + b^{(l)} \right)
+\end{equation}
+where $W^{(l)}$ and $b^{(l)}$ are the weights and biases, and $\sigma$ is the activation function.
+
+We used the \textbf{Adam} optimizer and \textbf{Mean Squared Error (MSE)} loss function. Since the target is log-transformed, minimizing MSE is equivalent to minimizing RMSLE on the original scale.
+
+\section{Experimental Settings}
+The training data was split into a training set (80\%) and a validation set (20\%).
+We performed a grid search to find the best hyperparameters for the MLP. The search space was:
+\begin{itemize}
+    \item Hidden Layer Sizes: (50,), (100,), (50, 50)
+    \item Activation Functions: ReLU, Tanh
+    \item Alpha (Weight Decay): 0.0001, 0.01
+    \item Initial Learning Rate: 0.001, 0.01
+\end{itemize}
+The maximum number of epochs was set to 500, with early stopping based on validation loss.
+
+\section{Results}
+
+\subsection{Performance Comparison}
+The evaluation metric is the Root Mean Squared Logarithmic Error (RMSLE). The results on the validation set are shown in Table \ref{tab:results}.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lc}
+        \toprule
+        \textbf{Model} & \textbf{RMSLE} \\
+        \midrule
+        Linear Regression & 1.0161 \\
+        MLP Regressor (PyTorch) & 0.2956 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Validation RMSLE Comparison}
+    \label{tab:results}
+\end{table}
+
+The PyTorch-based MLP Regressor significantly outperformed the Linear Regression baseline, achieving an RMSLE of 0.2956 compared to 1.0161. This demonstrates the effectiveness of deep learning in capturing non-linear relationships in the data.
+
+\subsection{Visualization}
+Figure \ref{fig:pred_plot} shows the scatter plot of actual vs. predicted values for the best MLP model. The points are tightly clustered around the ideal line, indicating high predictive accuracy.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{output/prediction_plot.png}
+    \caption{Actual vs Predicted Values (MLP - PyTorch)}
+    \label{fig:pred_plot}
+\end{figure}
+
+Figure \ref{fig:loss_curve} shows the training loss curve of the best MLP model. The loss decreases rapidly and stabilizes, indicating successful convergence.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{output/loss_curve.png}
+    \caption{MLP Training Loss Curve}
+    \label{fig:loss_curve}
+\end{figure}
+
+\section{Conclusion}
+In this experiment, we implemented a Multi-Layer Perceptron using PyTorch to predict bike sharing demand. By leveraging PyTorch's flexibility, we were able to train a custom neural network and optimize its hyperparameters. The MLP achieved a significantly lower RMSLE than the linear baseline, highlighting its ability to model complex, non-linear demand patterns. The use of standardization and log-transformation of the target variable were also crucial for the model's performance.
+
+\begin{thebibliography}{9}
+\bibitem{kaggle}
+Kaggle Bike Sharing Demand Competition. \url{https://www.kaggle.com/competitions/bike-sharing-demand}
+\bibitem{pytorch}
+Paszke, A., et al. "PyTorch: An Imperative Style, High-Performance Deep Learning Library." NeurIPS 2019.
+\end{thebibliography}
+
+\end{document}

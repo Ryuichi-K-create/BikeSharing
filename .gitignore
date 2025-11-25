@@ -1,2 +1,9 @@
 data/*
-output/*
+report.log
+report.aux
+report.out
+report.dvi
+report.aux
+report.fls
+missfont.log
+src/__pycache__/
